@@ -32,21 +32,25 @@ async function solveChallenge(pow) {
     global.window = global;
     global.process = undefined;
     let found = null;
+    let timeoutHandle = null;
     global.postMessage = (msg) => {
       if (Array.isArray(msg) && msg.length === 2) {
         found = msg[1];
+        if (timeoutHandle) clearTimeout(timeoutHandle);
         resolve(found);
       }
     };
     global.location = { href: "https://www.gocomics.com/.bunny-shield/assets/shield-worker.js", hostname: "www.gocomics.com" };
     global.loadArgon2WasmBinary = () => Promise.resolve(new Uint8Array(buf));
     if (!global.atob) global.atob = (s) => Buffer.from(s, "base64").toString("binary");
+    // Disable the worker's progress interval so it cannot keep the process alive.
+    global.setInterval = () => 0;
 
     const ctx = createContext(global);
     new Script(workerCode, { filename: "shield-worker.js" }).runInContext(ctx);
     ctx.onmessage({ data: [userkey, challenge, diff, diffString, { time: 2, mem: 512, hashLen: 32, parallelism: 1 }, 0, 4] });
 
-    setTimeout(() => { if (found === null) reject(new Error("challenge not solved")); }, 120000);
+    timeoutHandle = setTimeout(() => { if (found === null) reject(new Error("challenge not solved")); }, 120000);
   });
 
   const powResponse = `${pow}#${answer}`;
@@ -136,6 +140,7 @@ async function main() {
 
   writeFileSync(new URL("./calvinandhobbes.html", import.meta.url), html);
   console.log("Created calvinandhobbes.html");
+  process.exit(0);
 }
 
 main().catch((e) => { console.error(e); process.exit(1); });

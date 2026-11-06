@@ -30,7 +30,8 @@ async function solveChallenge(pow) {
   const answer = await new Promise((resolve, reject) => {
     global.self = global;
     global.window = global;
-    global.process = undefined;
+    const originalProcess = global.process;
+    global.process = { versions: {} };
     let found = null;
     let timeoutHandle = null;
     global.postMessage = (msg) => {
@@ -49,6 +50,9 @@ async function solveChallenge(pow) {
     const ctx = createContext(global);
     new Script(workerCode, { filename: "shield-worker.js" }).runInContext(ctx);
     ctx.onmessage({ data: [userkey, challenge, diff, diffString, { time: 2, mem: 512, hashLen: 32, parallelism: 1 }, 0, 4] });
+
+    // Restore the real process object now that the worker has been kicked off.
+    global.process = originalProcess;
 
     timeoutHandle = setTimeout(() => { if (found === null) reject(new Error("challenge not solved")); }, 120000);
   });
